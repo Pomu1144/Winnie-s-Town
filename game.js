@@ -46,9 +46,9 @@ class BootScene extends Phaser.Scene {
     // UI overlays
     this.load.image('inventoryscreen', 'assets/backgrounds/inventoryscreen.png');
 
-    // Top-bar holder images (may not exist — graceful fallback to drawn pills)
-    this.load.image('starsholder',    'assets/backgrounds/starsholder2.png');
-    this.load.image('currencyholder', 'assets/backgrounds/currencyholder2.png');
+    // Top-bar holder images
+    this.load.image('starsholder',    'assets/icons/starsholder2.png');
+    this.load.image('currencyholder', 'assets/icons/currencyholder2.png');
   }
 
   create() {
