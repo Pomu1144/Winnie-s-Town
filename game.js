@@ -28,6 +28,35 @@ function drawPill(gfx, x, y, w, h, radius, fillColor, fillAlpha, strokeColor, st
 }
 
 
+// ── page routing ─────────────────────────────────────────
+
+const PAGE_ROUTES = {
+  storefront: 'index.html',
+  shop: 'shop.html',
+  maps: 'maps.html',
+  inventory: 'inventory.html',
+  decorate: 'decorate.html',
+  'team-manager': 'team-manager.html',
+};
+
+const START_SCENE_BY_PAGE = {
+  storefront: 'CafeFrontScene',
+  shop: 'InsideCafeScene',
+  maps: 'MapScene',
+  inventory: 'InventoryScene',
+  decorate: 'DecorateScene',
+  'team-manager': 'TeamScene',
+};
+
+const CURRENT_PAGE = document.body?.dataset.page || 'storefront';
+
+function navigateToPage(pageKey) {
+  const target = PAGE_ROUTES[pageKey];
+  if (!target) return;
+  if (window.location.pathname.endsWith('/' + target) || window.location.pathname === '/' + target) return;
+  window.location.href = target;
+}
+
 // ================================================================
 //  BootScene — preload everything, generate procedural textures
 // ================================================================
@@ -81,7 +110,7 @@ class BootScene extends Phaser.Scene {
     g.generateTexture('leaf', 20, 38);
     g.destroy();
 
-    this.scene.start('CafeFrontScene');
+    this.scene.start(START_SCENE_BY_PAGE[CURRENT_PAGE] || 'CafeFrontScene');
   }
 }
 
@@ -188,7 +217,7 @@ class CafeFrontScene extends Phaser.Scene {
 
     this.enterBtn.on('pointerdown', () => {
       this.cameras.main.fadeOut(400, 0, 0, 0);
-      this.time.delayedCall(400, () => this.scene.start('InsideCafeScene'));
+      this.time.delayedCall(400, () => navigateToPage('shop'));
     });
   }
 
@@ -314,14 +343,23 @@ class InsideCafeScene extends Phaser.Scene {
     switch (id) {
       case 'map':
         this.cameras.main.fadeOut(400, 0, 0, 0);
-        this.time.delayedCall(400, () => this.scene.start('MapScene'));
+        this.time.delayedCall(400, () => navigateToPage('maps'));
+        break;
+      case 'shop':
+        this.cameras.main.fadeOut(400, 0, 0, 0);
+        this.time.delayedCall(400, () => navigateToPage('shop'));
         break;
       case 'decorate':
-        this._openInventory();
+        this.cameras.main.fadeOut(400, 0, 0, 0);
+        this.time.delayedCall(400, () => navigateToPage('decorate'));
         break;
       case 'team':
         this.cameras.main.fadeOut(400, 0, 0, 0);
-        this.time.delayedCall(400, () => this.scene.start('TeamScene'));
+        this.time.delayedCall(400, () => navigateToPage('team-manager'));
+        break;
+      case 'camera':
+        this.cameras.main.fadeOut(400, 0, 0, 0);
+        this.time.delayedCall(400, () => navigateToPage('inventory'));
         break;
     }
   }
@@ -425,7 +463,7 @@ class MapScene extends Phaser.Scene {
     const hit = this.add.zone(BX, BY, BW, BH).setOrigin(0, 0).setInteractive({ useHandCursor: true });
     hit.on('pointerdown', () => {
       this.cameras.main.fadeOut(400, 0, 0, 0);
-      this.time.delayedCall(400, () => this.scene.start('InsideCafeScene'));
+      this.time.delayedCall(400, () => navigateToPage('shop'));
     });
     this._backObjs = [gfx, label, hit];
   }
@@ -438,6 +476,88 @@ class MapScene extends Phaser.Scene {
   shutdown() { this.scale.off('resize', this._onResize, this); }
 }
 
+
+
+
+// ================================================================
+//  InventoryScene — full-screen inventory background
+// ================================================================
+class InventoryScene extends Phaser.Scene {
+  constructor() { super('InventoryScene'); }
+
+  create() {
+    const W = this.scale.width, H = this.scale.height;
+    const bgKey = this.textures.exists('inventoryscreen') ? 'inventoryscreen' : 'inventorybg';
+    this.bg = this.add.image(W / 2, H / 2, bgKey);
+    coverFit(this.bg, W, H);
+    this._buildBack();
+    this.scale.on('resize', this._onResize, this);
+    this.cameras.main.fadeIn(400);
+  }
+
+  _buildBack() {
+    if (this._backObjs) this._backObjs.forEach(o => o.destroy());
+    const BX = 16, BY = 14, BW = 118, BH = 46;
+    const gfx = this.add.graphics();
+    drawPill(gfx, BX, BY, BW, BH, 14, 0x120a04, 0.82, 0xf5c842, 0.80);
+    const label = this.add.text(BX + BW / 2, BY + BH / 2, '← Back', {
+      fontSize: '20px', color: '#ffe84a', fontFamily: 'Arial', fontStyle: 'bold',
+    }).setOrigin(0.5);
+    const hit = this.add.zone(BX, BY, BW, BH).setOrigin(0, 0).setInteractive({ useHandCursor: true });
+    hit.on('pointerdown', () => {
+      this.cameras.main.fadeOut(400, 0, 0, 0);
+      this.time.delayedCall(400, () => navigateToPage('shop'));
+    });
+    this._backObjs = [gfx, label, hit];
+  }
+
+  _onResize(gameSize) {
+    coverFit(this.bg, gameSize.width, gameSize.height);
+    this._buildBack();
+  }
+
+  shutdown() { this.scale.off('resize', this._onResize, this); }
+}
+
+
+// ================================================================
+//  DecorateScene — decorating view using inventory background
+// ================================================================
+class DecorateScene extends Phaser.Scene {
+  constructor() { super('DecorateScene'); }
+
+  create() {
+    const W = this.scale.width, H = this.scale.height;
+    this.bg = this.add.image(W / 2, H / 2, 'inventoryscreen');
+    coverFit(this.bg, W, H);
+    this._buildBack();
+    this.scale.on('resize', this._onResize, this);
+    this.cameras.main.fadeIn(400);
+  }
+
+  _buildBack() {
+    if (this._backObjs) this._backObjs.forEach(o => o.destroy());
+    const BX = 16, BY = 14, BW = 118, BH = 46;
+    const gfx = this.add.graphics();
+    drawPill(gfx, BX, BY, BW, BH, 14, 0x120a04, 0.82, 0xf5c842, 0.80);
+    const label = this.add.text(BX + BW / 2, BY + BH / 2, '← Back', {
+      fontSize: '20px', color: '#ffe84a', fontFamily: 'Arial', fontStyle: 'bold',
+    }).setOrigin(0.5);
+    const hit = this.add.zone(BX, BY, BW, BH).setOrigin(0, 0).setInteractive({ useHandCursor: true });
+    hit.on('pointerdown', () => {
+      this.cameras.main.fadeOut(400, 0, 0, 0);
+      this.time.delayedCall(400, () => navigateToPage('shop'));
+    });
+    this._backObjs = [gfx, label, hit];
+  }
+
+  _onResize(gameSize) {
+    coverFit(this.bg, gameSize.width, gameSize.height);
+    this._buildBack();
+  }
+
+  shutdown() { this.scale.off('resize', this._onResize, this); }
+}
 
 // ================================================================
 //  TeamScene — team manager
@@ -549,7 +669,7 @@ class TeamScene extends Phaser.Scene {
     const backHit = this.add.zone(BX, BY, BW, BH).setOrigin(0, 0).setInteractive({ useHandCursor: true });
     backHit.on('pointerdown', () => {
       this.cameras.main.fadeOut(400, 0, 0, 0);
-      this.time.delayedCall(400, () => this.scene.start('InsideCafeScene'));
+      this.time.delayedCall(400, () => navigateToPage('shop'));
     });
     this._uiObjs.push(backGfx, backLabel, backHit);
   }
@@ -575,6 +695,14 @@ window.addEventListener('load', () => {
       autoCenter: Phaser.Scale.CENTER_BOTH,
       parent: 'game-container',
     },
-    scene: [BootScene, CafeFrontScene, InsideCafeScene, MapScene, TeamScene],
+    scene: [
+      BootScene,
+      CafeFrontScene,
+      InsideCafeScene,
+      MapScene,
+      InventoryScene,
+      DecorateScene,
+      TeamScene,
+    ],
   });
 });
