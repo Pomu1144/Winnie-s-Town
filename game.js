@@ -591,7 +591,7 @@ class TeamScene extends Phaser.Scene {
       const ts = fitScale(title, Math.min(W * 0.55, 340), 68);
       title.setScale(ts);
       const label = this.add.text(W / 2, 38 + (title.height * ts) / 2, 'Team Manager', {
-        fontSize: '20px', color: '#ffe84a', fontFamily: 'Arial', fontStyle: 'bold',
+        fontSize: '30px', color: '#ffe84a', fontFamily: 'Arial', fontStyle: 'bold',
       }).setOrigin(0.5);
       this._uiObjs.push(title, label);
     } else {
@@ -599,24 +599,32 @@ class TeamScene extends Phaser.Scene {
       const gfx = this.add.graphics();
       drawPill(gfx, W / 2 - tw / 2, 14, tw, 56, 14, 0x120a04, 0.85, 0xf5c842, 0.9);
       const label = this.add.text(W / 2, 42, 'Team Manager', {
-        fontSize: '20px', color: '#ffe84a', fontFamily: 'Arial', fontStyle: 'bold',
+        fontSize: '30px', color: '#ffe84a', fontFamily: 'Arial', fontStyle: 'bold',
       }).setOrigin(0.5);
       this._uiObjs.push(gfx, label);
     }
 
     // ── Character slots grid ──────────────────────────────────────
-    const COLS  = 3;
-    const ROWS  = 2;
-    const slotW = Math.min((W - 60) / COLS, 160);
+    const COLS = 3;
+    const ROWS = 2;
+    const sideMargin = Math.max(20, W * 0.05);
+    const gap = Math.max(14, Math.min(26, W * 0.02));
+    const headerBottom = 104;
+    const controlsTop = H - 140;
+    const availableHeight = Math.max(190, controlsTop - headerBottom);
+    const maxSlotWByWidth = (W - sideMargin * 2 - gap * (COLS - 1)) / COLS;
+    const maxSlotWByHeight = (availableHeight - gap * (ROWS - 1)) / (ROWS * 1.25);
+    const slotW = Math.max(112, Math.min(maxSlotWByWidth, maxSlotWByHeight, 260));
     const slotH = slotW * 1.25;
-    const gridW = COLS * slotW + (COLS - 1) * 14;
-    const gx    = (W - gridW) / 2;
-    const gy    = 110;
+    const gridW = COLS * slotW + (COLS - 1) * gap;
+    const gridH = ROWS * slotH + (ROWS - 1) * gap;
+    const gx = (W - gridW) / 2;
+    const gy = headerBottom + (availableHeight - gridH) / 2;
 
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
-        const sx = gx + c * (slotW + 14);
-        const sy = gy + r * (slotH + 14);
+        const sx = gx + c * (slotW + gap);
+        const sy = gy + r * (slotH + gap);
 
         // Slot background
         const slotImg = this.add.image(sx + slotW / 2, sy + slotH / 2,
@@ -627,7 +635,7 @@ class TeamScene extends Phaser.Scene {
         // Locked indicator for empty slots
         const lockImg = this.add.image(sx + slotW / 2, sy + slotH / 2,
           this.textures.exists('charlocked') ? 'charlocked' : '__DEFAULT');
-        lockImg.setScale(fitScale(lockImg, slotW * 0.62, slotH * 0.62));
+        lockImg.setScale(fitScale(lockImg, slotW * 0.72, slotH * 0.72));
         lockImg.setAlpha(0.85);
         this._uiObjs.push(lockImg);
       }
@@ -639,13 +647,13 @@ class TeamScene extends Phaser.Scene {
       { key: 'battlebtn',  label: 'Battle'  },
       { key: 'reorderbtn', label: 'Reorder' },
     ];
-    const btnH  = Math.min(56, H * 0.075);
-    const btnW  = Math.min((W - 60) / actionBtns.length - 10, 130);
-    const row2Y = H - btnH - 80;
-    const row2X = (W - (actionBtns.length * (btnW + 10) - 10)) / 2;
+    const btnH  = Math.max(52, Math.min(76, H * 0.1));
+    const btnW  = Math.max(110, Math.min((W - sideMargin * 2) / actionBtns.length - gap, 180));
+    const row2Y = H - btnH * 0.75 - 40;
+    const row2X = (W - (actionBtns.length * (btnW + gap) - gap)) / 2;
 
     actionBtns.forEach((b, i) => {
-      const bx = row2X + i * (btnW + 10) + btnW / 2;
+      const bx = row2X + i * (btnW + gap) + btnW / 2;
       if (this.textures.exists(b.key)) {
         const img = this.add.image(bx, row2Y, b.key);
         img.setScale(fitScale(img, btnW, btnH));
@@ -654,7 +662,7 @@ class TeamScene extends Phaser.Scene {
       } else {
         const gfx = this.add.graphics();
         drawPill(gfx, bx - btnW / 2, row2Y - btnH / 2, btnW, btnH, 12, 0x2a1408, 0.9, 0xf5c842, 0.8);
-        const t = this.add.text(bx, row2Y, b.label, { fontSize: '15px', color: '#ffe84a', fontFamily: 'Arial' }).setOrigin(0.5);
+        const t = this.add.text(bx, row2Y, b.label, { fontSize: '20px', color: '#ffe84a', fontFamily: 'Arial' }).setOrigin(0.5);
         this._uiObjs.push(gfx, t);
       }
     });
