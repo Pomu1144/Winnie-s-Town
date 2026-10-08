@@ -1,0 +1,10 @@
+{
+  "name": "winnies-town",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A cosy 3v3 Bears & Pastries battle game set in Winnie's café town.",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "test": "node --test tests/*.test.js"
+  }
+}

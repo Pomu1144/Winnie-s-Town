@@ -2,23 +2,47 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Winnie's Town — Storefront</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
-      width: 100%; height: 100%;
-      overflow: hidden;
-      background: #1a0f06;
-    }
-    #game-container {
-      width: 100%; height: 100%;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Winnie's Town — Bears &amp; Pastries</title>
+  <meta name="description" content="A cosy café game of cute 3v3 battles. Collect Bears and Pastries across five rarities, decorate Winnie's café and explore the town." />
+  <meta name="theme-color" content="#d8914f" />
+  <meta property="og:title" content="Winnie's Town — Bears & Pastries" />
+  <meta property="og:description" content="Collect adorable Bears and Pastries, build your team of three and battle across town." />
+  <meta property="og:image" content="assets/ui/og-image.jpg" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Winnie's Town" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="assets/ui/favicon.png" />
+  <link rel="apple-touch-icon" href="assets/ui/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
 </head>
 <body data-page="storefront">
   <div id="game-container"></div>
+  <div id="boot-splash"><div class="paw"></div><p>Opening the café…</p></div>
+  <div id="rotate-hint"><div class="phone"></div><p>Turn your device sideways<br />for the cosiest view</p></div>
+  <noscript><p class="noscript">Winnie's Town needs JavaScript to open the café.</p></noscript>
+
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="game.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/battle-engine.js"></script>
+  <script src="js/save.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/scenes/boot.js"></script>
+  <script src="js/scenes/title.js"></script>
+  <script src="js/scenes/cafe.js"></script>
+  <script src="js/scenes/map.js"></script>
+  <script src="js/scenes/battle.js"></script>
+  <script src="js/scenes/team.js"></script>
+  <script src="js/scenes/shop.js"></script>
+  <script src="js/scenes/decorate.js"></script>
+  <script src="js/scenes/album.js"></script>
+  <script src="js/main.js"></script>
 </body>
 </html>
