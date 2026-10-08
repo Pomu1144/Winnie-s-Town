@@ -1,6 +1,6 @@
 /* ================================================================
  *  CafeScene — the hub. Winnie runs the counter, decor earns charm,
- *  customers drop by, and the tip jar fills with honey over time.
+ *  customers drop by, and the tip jar fills with coins over time.
  * ================================================================ */
 class CafeScene extends Phaser.Scene {
   constructor() { super('CafeScene'); }
@@ -11,7 +11,8 @@ class CafeScene extends Phaser.Scene {
     this.cameras.main.fadeIn(350, 42, 22, 10);
     WT.audio.setMood('cafe');
 
-    this.bg = ui.background(this, 'bg_cafe');
+    this.theme = WT.THEMES[WT.save.theme] || WT.THEMES.classic;
+    this.bg = ui.background(this, this.theme.key);
     this._chalkboard();
     this._winnie();
     this._decor();
@@ -22,7 +23,10 @@ class CafeScene extends Phaser.Scene {
     this.bar = ui.topBar(this);
     this._hud();
 
-    if (!WT.save.flags.intro) {
+    const levelUps = WT.claimCafeLevels();
+    if (levelUps.length) {
+      this.time.delayedCall(450, () => this._levelUp(levelUps));
+    } else if (!WT.save.flags.intro) {
       this.time.delayedCall(500, () => this._dialog(WT.DIALOG.intro, () => { WT.save.flags.intro = true; WT.persist(); this._pulseMap(); }));
     } else if (WT.save.stats.wins > 0 && !WT.save.flags.summonHint) {
       this.time.delayedCall(500, () => this._dialog(WT.DIALOG.summonHint, () => { WT.save.flags.summonHint = true; WT.persist(); }));
@@ -42,11 +46,11 @@ class CafeScene extends Phaser.Scene {
     const chalk = { stroke: 'rgba(0,0,0,0.15)', strokeW: 2 };
     WT.ui.text(this, a.x, a.y, 'Winnie\'s Café', 30, '#fffaf0', Object.assign({ weight: '700' }, chalk));
     const charm = WT.cafeCharm();
-    this.chalkLine = WT.ui.text(this, b.x, b.y, `Charm ${charm}  ·  ${WT.incomePerMin(charm).toFixed(1)} honey/min`, 18, '#f7e7cf', chalk);
+    this.chalkLine = WT.ui.text(this, b.x, b.y, `Café Lv ${WT.cafeLevelFor(charm)}  ·  Charm ${charm}  ·  ${WT.incomePerMin(charm).toFixed(1)} coins/min`, 18, '#f7e7cf', chalk);
   }
 
   _winnie() {
-    const top = this._p(750, 497);
+    const top = this._p(750, this.theme.counterY);
     const img = this.add.image(top.x, top.y + 40, 'npc_winnie').setOrigin(0.5, 1);
     img.setScale(250 / img.height);
     // hide everything below the counter top so Winnie stands behind it
@@ -62,24 +66,36 @@ class CafeScene extends Phaser.Scene {
   }
 
   _decor() {
-    WT.DECOR_SPOTS.forEach(spot => {
-      const key = WT.save.decorPlaced[spot.id];
-      if (!key || !WT.DECOR[key]) return;
-      const p = this._p(spot.x, spot.slot === 'floor' ? 830 : spot.y);
-      const img = this.add.image(p.x, p.y, 'decor_' + key).setOrigin(0.5, spot.slot === 'floor' ? 1 : 0.92);
-      const target = spot.slot === 'floor' ? { w: 230, h: 130 } : { w: 140, h: 92 };
-      img.setScale(Math.min(target.w / img.width, target.h / img.height));
-      img.setDepth(spot.slot === 'floor' ? 30 : 8);
-    });
+    WT.save.decorPlaced.forEach(item => { if (WT.DECOR[item.k]) WT.decorSprite(this, this.bg, item); });
+  }
+
+  /** Celebrate café levels reached since the last visit. */
+  _levelUp(levels) {
+    const { ui, TXT, COLORS: C } = WT;
+    const last = levels[levels.length - 1];
+    const gems = levels.reduce((s, l) => s + l.heartstones, 0);
+    const m = ui.modal(this, 620, 380, `Café Level ${last.level}!`);
+    WT.audio.play('victory');
+    for (let i = 0; i < 18; i++) {
+      const h = this.add.image(Phaser.Math.Between(-280, 280), Phaser.Math.Between(-150, 150), i % 2 ? 'fx_heart' : 'fx_spark').setTint(i % 3 ? 0xffb7cf : 0xffe08a).setScale(0.3).setAlpha(0);
+      m.box.add(h);
+      this.tweens.add({ targets: h, alpha: { from: 1, to: 0 }, y: h.y - 60, delay: i * 60, duration: 1200, repeat: 1 });
+    }
+    m.box.add(ui.text(this, 0, -70, 'Your café is getting so cosy!', 26, TXT.dark, { weight: '700' }));
+    m.box.add(ui.text(this, 0, -30, 'More customers are dropping by, and tips flow faster.', 19, TXT.brown, { weight: '500' }));
+    const gi = this.add.image(-50, 40, 'icon_heartstone'); gi.setScale(56 / gi.height); m.box.add(gi);
+    m.box.add(ui.text(this, -10, 40, `+${gems}`, 34, TXT.pink, { ox: 0, weight: '700' }));
+    m.box.add(ui.button(this, 0, 128, 220, 62, 'Lovely!', { color: 'mint', size: 26, onClick: () => { m.close(); this.bar.refresh(); this.bar.bump('gems'); } }));
   }
 
   _customers() {
     const charm = WT.cafeCharm();
     const who = [['npc_fox', 520], ['npc_bird', 1010], ['npc_monkey', 330], ['npc_seal', 1180]];
-    const n = charm >= 45 ? 4 : charm >= 25 ? 3 : charm >= 10 ? 2 : 1;
+    const lvl = WT.cafeLevelFor(charm);
+    const n = lvl >= 5 ? 4 : lvl >= 3 ? 3 : lvl >= 2 ? 2 : 1;
     who.slice(0, n).forEach(([key, x], i) => {
       const p = this._p(x, 808);
-      const img = this.add.image(p.x, p.y, key).setOrigin(0.5, 1).setDepth(25);
+      const img = this.add.image(p.x, p.y, key).setOrigin(0.5, 1).setDepth(25 + 808 / 10);
       img.setScale((key === 'npc_seal' ? 95 : 165) / img.height);
       if (x > 750) img.setFlipX(true);
       this.tweens.add({ targets: img, y: p.y - 4, duration: 900 + i * 120, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: i * 200 });
@@ -94,7 +110,7 @@ class CafeScene extends Phaser.Scene {
 
   _tipJar() {
     const p = this._p(1300, 505);
-    const jar = this.add.image(p.x, p.y, 'icon_honey').setOrigin(0.5, 0.95).setDepth(9);
+    const jar = this.add.image(p.x, p.y, 'decor_honeyjar').setOrigin(0.5, 0.95).setDepth(25 + 505 / 10);
     jar.setScale(80 / jar.height);
     jar.setInteractive({ useHandCursor: true });
     jar.on('pointerup', () => this._collect());
@@ -123,9 +139,9 @@ class CafeScene extends Phaser.Scene {
     const amt = WT.collectIncome();
     if (amt <= 0) { WT.ui.toast(this, 'The tip jar is empty — check back soon!'); return; }
     WT.audio.play('coin');
-    this._flyCoins(this.jar.x, this.jar.y - 40, this.bar.honeyPill, 'icon_honey', Math.min(10, 3 + Math.floor(amt / 30)));
+    this._flyCoins(this.jar.x, this.jar.y - 40, this.bar.honeyPill, 'icon_coin', Math.min(10, 3 + Math.floor(amt / 30)));
     this.time.delayedCall(650, () => { this.bar.refresh(); this.bar.bump('honey'); });
-    WT.ui.toast(this, `Collected ${amt} honey from tips!`);
+    WT.ui.toast(this, `Collected ${amt} coins from tips!`);
     this._updateJar();
   }
 
@@ -184,7 +200,7 @@ class CafeScene extends Phaser.Scene {
     if (WT.dailyAvailable()) {
       const gift = WT.claimDaily();
       this.winnieDot && this.winnieDot.destroy();
-      this._dialog([`Here's today's treat: ${gift.heartstones} heartstones and ${gift.honey} honey! Come back tomorrow for more.`], () => {
+      this._dialog([`Here's today's treat: ${gift.heartstones} heartstones and ${gift.honey} coins! Come back tomorrow for more.`], () => {
         this.bar.refresh(); this.bar.bump('gems'); this.bar.bump('honey'); WT.audio.play('coin');
       });
       return;
@@ -218,7 +234,7 @@ class CafeScene extends Phaser.Scene {
 WT.dialog = function (scene, lines, done, speaker) {
   const { W, H, ui } = WT;
   const layer = scene.add.container(0, 0).setDepth(700);
-  const dim = scene.add.rectangle(W / 2, H / 2, W, H, 0x2a160a, 0.35).setInteractive();
+  const dim = ui.fullRect(scene, 0x2a160a, 0.35).setInteractive();
   const portrait = scene.add.image(200, H - 20, speaker || 'npc_winnie').setOrigin(0.5, 1);
   portrait.setScale(300 / portrait.height);
   const boxW = 860, boxH = 170, bx = W / 2 + 90, by = H - 120;
@@ -258,18 +274,18 @@ WT.DIALOG = {
     'Oh! A visitor! Welcome to Winnie\'s Town. I\'m Winnie, and this little café is my pride and joy.',
     'Lately the Bears and the Pastries all over town have been squabbling in teams of three. Somebody has to calm everyone down!',
     'Honey Cub, Crumbly Croissant and Mochi Puff have offered to help you. Tap the Map below to start your first battle.',
-    'Win battles to earn honey and heartstones. Heartstones let you summon new friends from the Wishing Oven in the Shop!',
+    'Win battles to earn coins and heartstones. Coins buy furniture and treats to make the café cosier, and heartstones summon new friends from the Wishing Oven!',
   ],
   summonHint: [
     'Wonderful work out there! Every friend you meet has their own rarity — Common, Rare, Epic, Legendary, and the very rare Mythic.',
     'Visit the Shop to try the Wishing Oven. Duplicate friends add a star and make that friend stronger.',
-    'And don\'t forget the tip jar on the counter. The more charming the café looks, the faster it fills with honey!',
+    'And don\'t forget the tip jar on the counter. The more charming the café looks, the faster it fills with coins!',
   ],
   tips: [
     'Tanks can taunt — enemies have to hit them first. Put one in your team to keep your strikers safe!',
     'Three Bears in a team get Hibernation Hug: +15% max HP. Three Pastries get Sugar Rush: +15% attack.',
     'A mixed team of Bears and Pastries gets Café Friends: +8% speed. Speed decides who acts first!',
-    'Give your friends honey treats in the Team Manager to level them up between battles.',
+    'Give your friends treats in the Team Manager to level them up between battles.',
     'Every 40 summons without a Legendary guarantees one. The oven always keeps its promises.',
     'Decorating the café raises its charm, and charm makes the tip jar fill faster.',
     'Win without losing anyone to earn three stars. Stars show how well you know the town!',

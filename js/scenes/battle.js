@@ -25,10 +25,11 @@ class BattleScene extends Phaser.Scene {
     const enemies = this.loc.waves[this.wave].map(id => ({ id, level: lvl, stars: 1 + (this.wave === 2 && this.locIdx >= 4 ? 1 : 0) }));
     this.battle = new WT.Battle(allies, enemies, Math.random, { enemyScale: WT.ENEMY_SCALE });
 
-    ui.background(this, this.loc.arena);
+    this.arenaBg = ui.background(this, this.loc.arena);
     // soft vignette at the bottom for readability of controls
     const vg = this.add.graphics().setDepth(1);
-    for (let i = 0; i < 12; i++) { vg.fillStyle(0x2a160a, 0.035); vg.fillRect(0, H - 150 + i * 6, W, 150 - i * 6); }
+    const V = WT.VIEW;
+    for (let i = 0; i < 12; i++) { vg.fillStyle(0x2a160a, 0.035); vg.fillRect(V.x, H - 150 + i * 6, V.w, V.y + V.h - (H - 150 + i * 6)); }
 
     this.views = {};
     this.battle.units.forEach(u => this._makeView(u));
@@ -40,6 +41,12 @@ class BattleScene extends Phaser.Scene {
     // intro banner then begin
     this.input.enabled = true;
     this._banner(`${this.loc.name} · Battle ${this.wave + 1}`, 'Fight!').then(() => this._loop());
+  }
+
+  /** Called when the device rotates mid-battle: keep the fight, just re-cover the arena. */
+  onRelayout() {
+    const V = WT.VIEW, bg = this.arenaBg;
+    bg.setScale(Math.max(V.w / bg.width, V.h / bg.height));
   }
 
   // ── helpers ────────────────────────────────────────────────────
@@ -77,7 +84,7 @@ class BattleScene extends Phaser.Scene {
     bg.fillStyle(0x4e2a12, 0.75); bg.fillRoundedRect(-bw / 2 - 3, -9, bw + 6, 18, 9);
     bg.fillStyle(0xffffff, 0.9); bg.fillRoundedRect(-bw / 2, -6, bw, 12, 6);
     const fill = this.add.graphics();
-    const lvl = ui.text(this, -bw / 2 - 2, -20, `Lv${u.level} ${u.name}`, 14, WT.TXT.cream, { stroke: '#4e2a12', strokeW: 4, ox: 0, weight: '700' });
+    const lvl = ui.text(this, -bw / 2 - 2, -20, `Lv${u.level} ${u.name}`, 16, WT.TXT.cream, { stroke: '#4e2a12', strokeW: 4, ox: 0, weight: '700' });
     if (lvl.width > bw + 30) lvl.setScale((bw + 30) / lvl.width);
     const rDot = this.add.graphics();
     rDot.fillStyle(WT.RARITIES[u.rarity].color, 1); rDot.fillCircle(bw / 2 + 12, 0, 7); rDot.lineStyle(2, 0xffffff, 1); rDot.strokeCircle(bw / 2 + 12, 0, 7);
@@ -121,10 +128,10 @@ class BattleScene extends Phaser.Scene {
     let x = 0;
     Object.entries(v.u.statuses).forEach(([k, st]) => {
       const info = WT.STATUS_INFO[k];
-      const t = WT.ui.text(this, 0, 0, `${info.name} ${st.turns}`, 11, '#ffffff', { weight: '700' });
+      const t = WT.ui.text(this, 0, 0, `${info.name} ${st.turns}`, 13, '#ffffff', { weight: '700' });
       const w = t.width + 12;
       const g = this.add.graphics();
-      g.fillStyle(Phaser.Display.Color.HexStringToColor(info.color).color, 1); g.fillRoundedRect(x, -9, w, 18, 9);
+      g.fillStyle(Phaser.Display.Color.HexStringToColor(info.color).color, 1); g.fillRoundedRect(x, -11, w, 22, 11);
       t.setPosition(x + w / 2, 0);
       row.add([g, t]);
       x += w + 4;
@@ -227,7 +234,7 @@ class BattleScene extends Phaser.Scene {
     const g = ui.panel(this, 230, H - 112, W - 460, 100, { radius: 26, fill: 0xfff6e8 });
     panel.add(g);
     this.ctlName = ui.text(this, 262, H - 82, '', 22, TXT.dark, { ox: 0, weight: '700' });
-    this.ctlHint = ui.text(this, 262, H - 48, '', 16, TXT.brown, { ox: 0, wrap: 330, align: 'left', weight: '500' });
+    this.ctlHint = ui.text(this, 262, H - 50, '', 17, TXT.brown, { ox: 0, wrap: 340, align: 'left', weight: '500' });
     this.atkBtn = ui.button(this, W - 520, H - 62, 170, 72, 'Attack', { color: 'caramel', sub: 'Basic hit', size: 26, onClick: () => this._choose('attack', this.target) });
     this.skillBtn = ui.button(this, W - 335, H - 62, 190, 72, 'Skill', { color: 'pink', sub: '', size: 22, onClick: () => this._choose('skill', this.target) });
     panel.add([this.ctlName, this.ctlHint, this.atkBtn, this.skillBtn]);
@@ -624,7 +631,7 @@ class BattleScene extends Phaser.Scene {
     }
     // rewards
     const rwY = -80;
-    const hi = this.add.image(-150, rwY, 'icon_honey'); hi.setScale(44 / hi.height); m.box.add(hi);
+    const hi = this.add.image(-150, rwY, 'icon_coin'); hi.setScale(44 / hi.height); m.box.add(hi);
     m.box.add(ui.text(this, -120, rwY, `+${rw.honey}`, 28, TXT.brown, { ox: 0, weight: '700' }));
     if (rw.heartstones) {
       const gi = this.add.image(60, rwY, 'icon_heartstone'); gi.setScale(44 / gi.height); m.box.add(gi);
@@ -682,18 +689,18 @@ class BattleScene extends Phaser.Scene {
     const helper = this.add.image(-230, 20, 'npc_winnie'); helper.setScale(170 / helper.height); m.box.add(helper);
     const tips = [];
     if (WT.save.heartstones >= WT.GACHA.single) tips.push('• Summon new friends at the Wishing Oven');
-    tips.push('• Level up your team with honey treats');
+    tips.push('• Level up your team with treats in the Team Manager');
     if (!WT.save.team.some(id => WT.UNITS[id] && WT.UNITS[id].role === 'tank')) tips.push('• Bring a Tank to soak up hits');
     if (!WT.save.team.some(id => WT.UNITS[id] && WT.UNITS[id].role === 'support')) tips.push('• A Support can heal your team');
-    tips.push('• Earlier battles can be replayed for honey');
+    tips.push('• Earlier battles can be replayed for coins');
     m.box.add(ui.text(this, -120, -70, 'Don\'t worry, the pastries play rough!', 22, TXT.dark, { ox: 0, weight: '700' }));
     m.box.add(ui.text(this, -120, 0, tips.slice(0, 4).join('\n'), 19, TXT.brown, { ox: 0, oy: 0.3, align: 'left', lineSpacing: 8, weight: '500' }));
     m.box.add(ui.button(this, -220, 170, 170, 60, 'Map', { color: 'cream', onClick: () => WT.go(this, 'MapScene', { openLoc: this.locIdx }) }));
     m.box.add(ui.button(this, 0, 170, 170, 60, 'Team', { color: 'caramel', onClick: () => WT.go(this, 'TeamScene') }));
     m.box.add(ui.button(this, 220, 170, 170, 60, 'Retry', { color: 'mint', onClick: () => WT.go(this, 'BattleScene', { locIdx: this.locIdx, wave: this.wave }) }));
-    // a little honey even on defeat so progress never stalls (flat, so it can't be farmed)
+    // a few coins even on defeat so progress never stalls (flat, so it can't be farmed)
     const consolation = 20;
     WT.save.honey += consolation; WT.persist();
-    m.box.add(ui.text(this, 0, 110, `Winnie packed you a snack: +${consolation} honey`, 17, TXT.pink, { weight: '600' }));
+    m.box.add(ui.text(this, 0, 110, `Winnie slipped you some tips: +${consolation} coins`, 17, TXT.pink, { weight: '600' }));
   }
 }

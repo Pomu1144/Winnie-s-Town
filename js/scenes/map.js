@@ -140,7 +140,7 @@ class MapScene extends Phaser.Scene {
       // rewards
       const rw = WT.stageRewards(idx, w, earned === 0);
       const rx = 170;
-      const hi = this.add.image(rx, y - 14, 'icon_honey'); hi.setScale(30 / hi.height); m.box.add(hi);
+      const hi = this.add.image(rx, y - 14, 'icon_coin'); hi.setScale(30 / hi.height); m.box.add(hi);
       m.box.add(ui.text(this, rx + 18, y - 14, String(rw.honey), 18, TXT.brown, { ox: 0, weight: '700' }));
       if (rw.heartstones) {
         const gi = this.add.image(rx, y + 18, 'icon_heartstone'); gi.setScale(30 / gi.height); m.box.add(gi);

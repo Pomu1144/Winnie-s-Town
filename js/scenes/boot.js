@@ -75,7 +75,8 @@ class BootScene extends Phaser.Scene {
     Object.entries(icons).forEach(([k, f]) => L.image(k, `assets/opt/icons/${f}.webp`));
     // decor
     Object.keys(WT.DECOR).forEach(k => L.image('decor_' + k, `assets/opt/decor/${k}.webp`));
-    L.image('icon_honey', 'assets/opt/decor/honeyjar.webp');
+    L.image('icon_coin', 'assets/ui/coin.webp');
+    ['honey', 'matcha', 'strawberry', 'starlight'].forEach(k => L.image('theme_' + k, `assets/opt/scene/theme_${k}.webp`));
     L.image('icon_heartstone', 'assets/opt/decor/heartstone.webp');
   }
 

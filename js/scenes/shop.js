@@ -10,6 +10,7 @@ class ShopScene extends Phaser.Scene {
     this.cameras.main.fadeIn(300, 42, 22, 10);
     WT.audio.setMood('cafe');
     this.tab = (data && data.tab) || 'summon';
+    this.cat = (data && data.cat) || 'all';
 
     ui.background(this, 'bg_shop');
     ui.sparkles(this, 12, 0xffd6e6);
@@ -54,12 +55,12 @@ class ShopScene extends Phaser.Scene {
       const count = WT.UNIT_IDS.filter(id => WT.UNITS[id].rarity === k).length;
       ui.text(this, px + 210, y, `${r.weight}%`, 20, TXT.dark, { ox: 0, weight: '700' });
       ui.text(this, px + 300, y, `${count} friends`, 17, TXT.brown, { ox: 0 });
-      // owned dots
+      // collection progress for this rarity
       const owned = WT.UNIT_IDS.filter(id => WT.UNITS[id].rarity === k && WT.owned(id)).length;
-      for (let d = 0; d < count; d++) {
-        const g = this.add.graphics();
-        g.fillStyle(d < owned ? r.color : 0xe6d8c8, 1); g.fillCircle(px + 420 + d * 22, y, 8);
-      }
+      const bg = this.add.graphics();
+      bg.fillStyle(0xe6d8c8, 1); bg.fillRoundedRect(px + 410, y - 7, 110, 14, 7);
+      bg.fillStyle(r.color, 1); bg.fillRoundedRect(px + 410, y - 7, Math.max(owned ? 10 : 0, 110 * owned / count), 14, 7);
+      ui.text(this, px + 465, y + 18, `${owned}/${count} met`, 13, TXT.brown, { weight: '600' });
     });
 
     const left = WT.GACHA.pity - WT.save.pity;
@@ -100,7 +101,7 @@ class ShopScene extends Phaser.Scene {
     const best = Math.max(...results.map(r => WT.RARITIES[WT.UNITS[r.id].rarity].tier));
     const bestColor = WT.RARITIES[WT.RARITY_ORDER[best - 1]].color;
     const layer = this.add.container(0, 0).setDepth(1000);
-    const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x2a160a, 0).setInteractive();
+    const dim = ui.fullRect(this, 0x2a160a, 0).setInteractive();
     layer.add(dim);
     this.tweens.add({ targets: dim, fillAlpha: 0.75, duration: 300 });
 
@@ -123,7 +124,7 @@ class ShopScene extends Phaser.Scene {
       await wait(i === 2 && best >= 4 ? 700 : 480);
     }
     if (best >= 4) this.cameras.main.shake(300, 0.01);
-    const flash = this.add.rectangle(W / 2, H / 2, W, H, 0xffffff, 0);
+    const flash = ui.fullRect(this, 0xffffff, 0);
     layer.add(flash);
     await new Promise(r => this.tweens.add({ targets: flash, fillAlpha: 1, duration: 160, yoyo: true, onYoyo: () => { oven.destroy(); glow.destroy(); }, onComplete: r }));
 
@@ -153,7 +154,7 @@ class ShopScene extends Phaser.Scene {
   _resultTag(r) {
     if (r.isNew) return ['NEW!', '#ffe27a', '#a54866'];
     if (r.starUp) return [`★ ${r.stars}`, '#ffe27a', '#8a5a06'];
-    return [`+${r.honey} honey`, '#fff7ea', '#7a4520'];
+    return [`+${r.honey} coins`, '#fff7ea', '#7a4520'];
   }
 
   async _revealSingle(layer, r) {
@@ -214,14 +215,26 @@ class ShopScene extends Phaser.Scene {
   _decorTab() {
     const { ui, TXT, COLORS: C } = WT;
     const x = 40, y = 100, w = 1200, h = 600;
+    const cat = this.cat || 'all';
     ui.panel(this, x, y, w, h, { radius: 28 });
-    ui.text(this, x + 30, y + 36, 'Make the café cosier — more charm means more tips!', 22, TXT.dark, { ox: 0, weight: '700' });
-    ui.text(this, x + w - 30, y + 36, `Café charm ${WT.cafeCharm()}`, 20, TXT.pink, { ox: 1, weight: '700' });
+    const charm = WT.cafeCharm();
+    ui.text(this, x + 30, y + 36, `Café Lv ${WT.cafeLevelFor(charm)} · charm ${charm}`, 22, TXT.dark, { ox: 0, weight: '700' });
 
-    const keys = Object.keys(WT.DECOR).sort((a, b) => WT.DECOR[a].cost - WT.DECOR[b].cost);
-    const cols = 6, cw = 176, ch = 210, gap = 14;
+    [['all', 'All'], ['counter', 'Counter'], ['floor', 'Floor'], ['wall', 'Wall'], ['themes', 'Themes']].forEach(([k, label], i) => {
+      ui.button(this, x + 470 + i * 140, y + 36, 128, 44, label, {
+        color: cat === k ? 'pink' : 'cream', size: 18,
+        onClick: () => this.scene.restart({ tab: 'decor', cat: k }),
+      });
+    });
+
+    if (cat === 'themes') { this._themeGrid(x, y, w, h); return; }
+
+    const keys = Object.keys(WT.DECOR)
+      .filter(k => cat === 'all' || WT.DECOR[k].slot === cat)
+      .sort((a, b) => WT.DECOR[a].cost - WT.DECOR[b].cost);
+    const cols = 6, cw = 176, ch = 214, gap = 14;
     const rows = Math.ceil(keys.length / cols);
-    const scroll = ui.scrollArea(this, x + 24, y + 70, w - 48, h - 90, rows * (ch + gap) + 10);
+    const scroll = ui.scrollArea(this, x + 24, y + 72, w - 48, h - 92, rows * (ch + gap) + 10);
     keys.forEach((k, i) => {
       const d = WT.DECOR[k];
       const cx = (i % cols) * (cw + gap) + cw / 2 + 4;
@@ -230,27 +243,64 @@ class ShopScene extends Phaser.Scene {
       g.fillStyle(C.paper, 1); g.fillRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 18);
       g.lineStyle(3, C.caramel, 1); g.strokeRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 18);
       scroll.add(g);
-      const img = this.add.image(cx, cy - 40, 'decor_' + k);
-      img.setScale(Math.min(140 / img.width, 90 / img.height));
+      const img = this.add.image(cx, cy - 42, 'decor_' + k);
+      img.setScale(Math.min(140 / img.width, 92 / img.height));
       scroll.add(img);
-      scroll.add(ui.text(this, cx, cy + 22, d.name, 16, TXT.dark, { weight: '700', wrap: cw - 16 }));
-      scroll.add(ui.text(this, cx, cy + 44, `♥ +${d.charm} charm · ${d.slot}`, 13, TXT.pink, { weight: '600' }));
+      const nm = ui.text(this, cx, cy + 20, d.name, 16, TXT.dark, { weight: '700' });
+      if (nm.width > cw - 14) nm.setScale((cw - 14) / nm.width);
+      scroll.add(nm);
+      scroll.add(ui.text(this, cx, cy + 44, `♥ +${d.charm} · ${d.slot}`, 14, TXT.pink, { weight: '600' }));
       const owned = WT.save.decorOwned[k] || 0;
       if (owned) {
-        const b = this.add.graphics(); b.fillStyle(C.mintDark, 1); b.fillRoundedRect(cx + cw / 2 - 58, cy - ch / 2 + 8, 50, 22, 11);
+        const b = this.add.graphics(); b.fillStyle(C.mintDark, 1); b.fillRoundedRect(cx + cw / 2 - 58, cy - ch / 2 + 8, 50, 24, 12);
         scroll.add(b);
-        scroll.add(ui.text(this, cx + cw / 2 - 33, cy - ch / 2 + 19, `×${owned}`, 13, '#ffffff', { weight: '700' }));
+        scroll.add(ui.text(this, cx + cw / 2 - 33, cy - ch / 2 + 20, `×${owned}`, 14, '#ffffff', { weight: '700' }));
       }
-      const btn = ui.button(this, cx, cy + 78, cw - 30, 44, `${d.cost}`, { color: WT.save.honey >= d.cost ? 'gold' : 'grey', icon: 'icon_honey', size: 20, sfx: 'coin',
+      const btn = ui.button(this, cx, cy + 80, cw - 30, 46, `${d.cost}`, { color: WT.save.honey >= d.cost ? 'gold' : 'grey', icon: 'icon_coin', size: 20, sfx: 'coin',
         onClick: () => {
-          if (WT.save.honey < d.cost) { WT.ui.toast(this, 'Not enough honey yet!'); WT.audio.play('error'); return; }
+          if (WT.save.honey < d.cost) { WT.ui.toast(this, 'Not enough coins yet — win battles to earn more!'); WT.audio.play('error'); return; }
           WT.save.honey -= d.cost;
           WT.save.decorOwned[k] = owned + 1;
           WT.persist();
-          WT.ui.toast(this, `Bought ${d.name}! Place it in Decorate.`);
-          this.time.delayedCall(250, () => this.scene.restart({ tab: 'decor' }));
+          this._boughtPrompt(d.name);
         } });
       scroll.add(btn);
     });
+  }
+
+  _themeGrid(x, y, w, h) {
+    const { ui, TXT, COLORS: C } = WT;
+    Object.keys(WT.THEMES).forEach((k, i) => {
+      const t = WT.THEMES[k];
+      const cx = x + 130 + i * 235, cy = y + 330;
+      const owned = !!WT.save.themesOwned[k];
+      const active = WT.save.theme === k;
+      const g = this.add.graphics();
+      g.fillStyle(active ? 0xffe7f0 : C.paper, 1); g.fillRoundedRect(cx - 108, cy - 230, 216, 470, 20);
+      g.lineStyle(active ? 5 : 3, active ? C.pinkDark : C.caramel, 1); g.strokeRoundedRect(cx - 108, cy - 230, 216, 470, 20);
+      const th = this.add.image(cx, cy - 140, t.key); th.setScale(196 / th.width);
+      ui.text(this, cx, cy - 10, t.name, 22, TXT.dark, { weight: '700', wrap: 200 });
+      ui.text(this, cx, cy + 30, t.charm ? `♥ +${t.charm} charm` : 'The original look', 17, TXT.pink, { weight: '600' });
+      const label = active ? 'In use' : owned ? 'Use' : `${t.cost}`;
+      const b = ui.button(this, cx, cy + 170, 176, 60, label, {
+        color: active ? 'grey' : owned ? 'mint' : WT.save.honey >= t.cost ? 'gold' : 'grey', size: 22, icon: owned ? null : 'icon_coin', sfx: 'coin',
+        onClick: () => {
+          if (owned) WT.save.theme = k, WT.persist();
+          else if (!WT.buyTheme(k)) { WT.ui.toast(this, 'Not enough coins yet — win battles to earn more!'); return; }
+          WT.ui.toast(this, `Your café is now ${t.name}!`);
+          this.time.delayedCall(250, () => this.scene.restart({ tab: 'decor', cat: 'themes' }));
+        },
+      });
+      if (active) b.setEnabled(false);
+    });
+  }
+
+  /** After buying: offer to jump straight into decorating. */
+  _boughtPrompt(name) {
+    const { ui, TXT } = WT;
+    const m = ui.modal(this, 560, 300, 'Bought!', { onClose: () => this.scene.restart({ tab: 'decor', cat: this.cat }) });
+    m.box.add(ui.text(this, 0, -40, `${name} is waiting in storage.`, 24, TXT.dark, { weight: '600' }));
+    m.box.add(ui.button(this, -120, 70, 200, 60, 'Keep shopping', { color: 'cream', size: 20, onClick: () => m.close() }));
+    m.box.add(ui.button(this, 120, 70, 200, 60, 'Decorate', { color: 'mint', size: 22, onClick: () => WT.go(this, 'DecorateScene') }));
   }
 }

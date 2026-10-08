@@ -23,8 +23,12 @@ globalThis.WT = globalThis.WT || {};
       progress: {},            // 'locId:wave' -> best stars (1..3)
       pity: 0,                 // pulls since last Legendary+
       totalPulls: 0,
-      decorOwned: { tea: 1 },
-      decorPlaced: { c2: 'tea' },
+      decorOwned: { tea: 1, plantpot: 1 },
+      // free placement: positions are in café-art pixels (1500×1000); f = flipped
+      decorPlaced: [{ k: 'tea', x: 560, y: 512, f: 0 }, { k: 'plantpot', x: 1300, y: 830, f: 0 }],
+      theme: 'classic',
+      themesOwned: { classic: 1 },
+      cafeLevelClaimed: 1,
       lastCollect: now,
       lastDaily: 0,
       settings: { sound: true, music: true },
@@ -38,6 +42,12 @@ globalThis.WT = globalThis.WT || {};
       const raw = localStorage.getItem(KEY);
       if (!raw) return freshSave();
       const data = JSON.parse(raw);
+      // Older saves stored decor per fixed spot; convert to free placement.
+      if (data.decorPlaced && !Array.isArray(data.decorPlaced)) {
+        data.decorPlaced = Object.entries(data.decorPlaced)
+          .map(([spot, k]) => { const sp = WT.DECOR_SPOTS.find(d => d.id === spot); return sp && WT.DECOR[k] ? { k, x: sp.x, y: sp.slot === 'floor' ? 830 : sp.y, f: 0 } : null; })
+          .filter(Boolean);
+      }
       // Fill any fields added after this save was written.
       return Object.assign(freshSave(), data, { v: VERSION });
     } catch (e) {
@@ -87,7 +97,28 @@ globalThis.WT = globalThis.WT || {};
   };
 
   WT.cafeCharm = function () {
-    return Object.values(WT.save.decorPlaced).reduce((s, d) => s + (d && WT.DECOR[d] ? WT.DECOR[d].charm : 0), 0);
+    const decor = WT.save.decorPlaced.reduce((s, d) => s + (WT.DECOR[d.k] ? WT.DECOR[d.k].charm : 0), 0);
+    const theme = WT.THEMES[WT.save.theme] ? WT.THEMES[WT.save.theme].charm : 0;
+    return decor + theme;
+  };
+
+  WT.cafeLevel = () => WT.cafeLevelFor(WT.cafeCharm());
+
+  /** Copies of a decor piece still in storage (owned minus placed). */
+  WT.decorInStorage = k => (WT.save.decorOwned[k] || 0) - WT.save.decorPlaced.filter(d => d.k === k).length;
+
+  /** Pay out any café levels reached since last time. Returns [{ level, heartstones }]. */
+  WT.claimCafeLevels = function () {
+    const out = [];
+    const lvl = WT.cafeLevel();
+    while (WT.save.cafeLevelClaimed < lvl) {
+      WT.save.cafeLevelClaimed++;
+      const gems = WT.cafeLevelReward(WT.save.cafeLevelClaimed);
+      WT.save.heartstones += gems;
+      out.push({ level: WT.save.cafeLevelClaimed, heartstones: gems });
+    }
+    if (out.length) WT.persist();
+    return out;
   };
 
   /** Honey waiting in the tip jar. */

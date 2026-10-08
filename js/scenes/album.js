@@ -5,42 +5,47 @@
 class AlbumScene extends Phaser.Scene {
   constructor() { super('AlbumScene'); }
 
-  create() {
+  create(data) {
     const { W, H, ui, TXT, COLORS: C } = WT;
     this._leaving = false;
     this.cameras.main.fadeIn(300, 42, 22, 10);
+    this.filter = (data && data.filter) || 'bear';
     ui.background(this, 'bg_paper');
     this.bar = ui.topBar(this, { back: true });
     ui.backButton(this, () => WT.go(this, 'CafeScene')).setDepth(450);
-    ui.ribbon(this, 330, 50, 'Photo Album', { size: 28, h: 54 });
 
-    const owned = WT.UNIT_IDS.filter(WT.owned).length;
-    const px = 40, py = 100, pw = W - 80, ph = H - 120;
+    const px = 30, py = 92, pw = W - 60, ph = H - 106;
     ui.panel(this, px, py, pw, ph, { radius: 28 });
-    ui.text(this, px + 30, py + 34, `${owned}/${WT.UNIT_IDS.length} friends photographed`, 22, TXT.dark, { ox: 0, weight: '700' });
-    // completion bar
+    const ids = WT.UNIT_IDS.filter(id => this.filter === 'all' || WT.UNITS[id].faction === this.filter)
+      .sort((a, b) => WT.RARITIES[WT.UNITS[a].rarity].tier - WT.RARITIES[WT.UNITS[b].rarity].tier);
+    const owned = ids.filter(WT.owned).length;
+    const label = this.filter === 'bear' ? 'Bears' : this.filter === 'pastry' ? 'Pastries' : 'Friends';
+    ui.text(this, px + 28, py + 36, `${label} photographed  ${owned}/${ids.length}`, 22, TXT.dark, { ox: 0, weight: '700' });
     const g = this.add.graphics();
-    g.fillStyle(0xead9c4, 1); g.fillRoundedRect(px + 400, py + 24, 360, 20, 10);
-    g.fillStyle(C.pink, 1); g.fillRoundedRect(px + 400, py + 24, Math.max(14, 360 * owned / WT.UNIT_IDS.length), 20, 10);
-    ui.text(this, px + pw - 30, py + 34, 'Bears on top · Pastries below', 17, TXT.brown, { ox: 1 });
+    g.fillStyle(0xead9c4, 1); g.fillRoundedRect(px + 400, py + 27, 260, 18, 9);
+    g.fillStyle(C.pink, 1); g.fillRoundedRect(px + 400, py + 27, Math.max(owned ? 12 : 0, 260 * owned / ids.length), 18, 9);
 
-    ['bear', 'pastry'].forEach((fac, row) => {
-      const ids = WT.UNIT_IDS.filter(id => WT.UNITS[id].faction === fac);
-      const fb = this.add.image(px + 50, py + 175 + row * 270, 'faction_' + fac); fb.setScale(60 / fb.width);
-      ids.forEach((id, i) => {
-        const x = px + 150 + i * 132, y = py + 175 + row * 270;
-        const have = WT.owned(id);
-        if (have) {
-          const r = WT.save.roster[id];
-          ui.unitCard(this, x, y, 124, 166, id, { stars: r.stars, compact: true, onClick: () => this._photo(id) });
-        } else {
-          const lock = this.add.image(x, y, 'card_locked');
-          lock.setScale(Math.min(124 / lock.width, 166 / lock.height));
-          lock.setInteractive({ useHandCursor: true });
-          lock.on('pointerup', () => { WT.audio.play('tap'); WT.ui.toast(this, `A ${WT.RARITIES[WT.UNITS[id].rarity].name} friend you haven't met yet…`); });
-        }
-        ui.rarityTag(this, x, y + 104, WT.UNITS[id].rarity, 12);
-      });
+    [['bear', 'Bears'], ['pastry', 'Pastries'], ['all', 'All']].forEach(([k, l], i) => {
+      ui.button(this, px + 790 + i * 140, py + 36, 128, 44, l, { color: this.filter === k ? 'pink' : 'cream', size: 18, onClick: () => this.scene.restart({ filter: k }) });
+    });
+
+    const cols = 8, cw = 136, ch = 182, gx = 12, gy = 40;
+    const rows = Math.ceil(ids.length / cols);
+    const scroll = ui.scrollArea(this, px + 18, py + 70, pw - 36, ph - 84, rows * (ch + gy) + 10);
+    ids.forEach((id, i) => {
+      const x = (i % cols) * (cw + gx) + cw / 2 + 6;
+      const y = Math.floor(i / cols) * (ch + gy) + ch / 2 + 6;
+      if (WT.owned(id)) {
+        const r = WT.save.roster[id];
+        scroll.add(ui.unitCard(this, x, y, cw, ch, id, { stars: r.stars, compact: true, onClick: () => this._photo(id) }));
+      } else {
+        const lock = this.add.image(x, y, 'card_locked');
+        lock.setScale(Math.min(cw / lock.width, ch / lock.height));
+        lock.setInteractive({ useHandCursor: true });
+        lock.on('pointerup', (p) => { if (!ui.tapOk(lock, p)) return; WT.audio.play('tap'); WT.ui.toast(this, `A ${WT.RARITIES[WT.UNITS[id].rarity].name} friend you haven't met yet…`); });
+        scroll.add(lock);
+      }
+      scroll.add(ui.rarityTag(this, x, y + ch / 2 + 16, WT.UNITS[id].rarity, 12));
     });
   }
 

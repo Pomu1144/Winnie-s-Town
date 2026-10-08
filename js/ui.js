@@ -26,12 +26,14 @@ globalThis.WT = globalThis.WT || {};
   ui.tapOk = function (obj, p) {
     if (p && p.getDistance && p.getDistance() > 14) return false;
     const clip = obj.parentContainer && obj.parentContainer.clip;
-    if (clip && p && !clip.contains(p.x, p.y)) return false;
+    if (clip && p && !clip.contains(p.worldX, p.worldY)) return false;
     return true;
   };
 
   // ── text ───────────────────────────────────────────────────────
   ui.text = function (scene, x, y, str, size, color, opts = {}) {
+    // Phones show the 1280×720 stage at roughly half size, so small text gets a boost.
+    if (WT.isTouch && !opts.exact) size = size <= 12 ? 14 : size < 18 ? size + 2 : size;
     const style = {
       fontFamily: FONT, fontSize: size + 'px', color: color || TXT.dark,
       fontStyle: opts.weight || '600', align: opts.align || 'center',
@@ -345,7 +347,7 @@ globalThis.WT = globalThis.WT || {};
    */
   ui.modal = function (scene, w, h, title, opts = {}) {
     const layer = scene.add.container(0, 0).setDepth(opts.depth || 500);
-    const dim = scene.add.rectangle(W / 2, H / 2, W, H, 0x2a160a, 0.55).setInteractive();
+    const dim = ui.fullRect(scene, 0x2a160a, 0.55).setInteractive();
     layer.add(dim);
     const box = scene.add.container(W / 2, H / 2);
     box.add(ui.panel(scene, -w / 2, -h / 2, w, h, { radius: 28, borderW: 6 }));
@@ -420,12 +422,12 @@ globalThis.WT = globalThis.WT || {};
     return c;
   }
 
-  /** Stars / honey / heartstones + settings. Scenes call bar.refresh() after changes. */
+  /** Stars / coins / heartstones + settings. Scenes call bar.refresh() after changes. */
   ui.topBar = function (scene, opts = {}) {
     const bar = scene.add.container(0, 0).setDepth(400);
     // scenes with a back button shift the stars pill right to make room
     const stars = pill(scene, opts.back ? 200 : 110, 40, 'icon_star', WT.totalStars(), TXT.gold);
-    const honey = pill(scene, W - 470, 40, 'icon_honey', WT.save.honey, TXT.brown);
+    const honey = pill(scene, W - 470, 40, 'icon_coin', WT.save.honey, TXT.brown);
     const gems = pill(scene, W - 290, 40, 'icon_heartstone', WT.save.heartstones, TXT.pink,
       opts.noShopLink ? null : () => WT.go(scene, 'ShopScene', { tab: 'summon' }));
     bar.add([stars, honey, gems]);
@@ -448,7 +450,7 @@ globalThis.WT = globalThis.WT || {};
   };
 
   ui.settings = function (scene) {
-    const m = ui.modal(scene, 520, 400, 'Settings');
+    const m = ui.modal(scene, 540, 440, 'Settings');
     const row = (y, label, getter, setter) => {
       m.box.add(ui.text(scene, -150, y, label, 24, TXT.dark, { ox: 0, weight: '600' }));
       const b = ui.button(scene, 150, y, 140, 52, getter() ? 'On' : 'Off', {
@@ -457,9 +459,13 @@ globalThis.WT = globalThis.WT || {};
       });
       m.box.add(b);
     };
-    row(-90, 'Music', () => WT.save.settings.music, v => WT.audio.setMusic(v));
-    row(-20, 'Sound effects', () => WT.save.settings.sound, v => WT.audio.setSound(v));
-    const reset = ui.button(scene, 0, 75, 300, 54, 'Reset progress', { color: 'pink', size: 22, onClick: () => {
+    row(-110, 'Music', () => WT.save.settings.music, v => WT.audio.setMusic(v));
+    row(-45, 'Sound effects', () => WT.save.settings.sound, v => WT.audio.setSound(v));
+    row(20, 'Fullscreen', () => WT.save.settings.fullscreen !== false, v => {
+      WT.save.settings.fullscreen = v; WT.persist();
+      if (v) WT.enterFullscreen(); else if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    });
+    const reset = ui.button(scene, 0, 95, 300, 54, 'Reset progress', { color: 'pink', size: 22, onClick: () => {
       m.close();
       const c = ui.modal(scene, 520, 300, 'Are you sure?');
       c.box.add(ui.text(scene, 0, -30, 'This erases your whole café,\nevery friend and all progress.', 22, TXT.dark, { lineSpacing: 6 }));
@@ -467,7 +473,7 @@ globalThis.WT = globalThis.WT || {};
       c.box.add(ui.button(scene, 110, 80, 180, 56, 'Erase', { color: 'pink', onClick: () => { WT.resetSave(); WT.go(scene, 'TitleScene'); } }));
     } });
     m.box.add(reset);
-    m.box.add(ui.text(scene, 0, 150, 'Winnie\'s Town v1.0 · progress saves automatically', 15, TXT.grey));
+    m.box.add(ui.text(scene, 0, 170, 'Winnie\'s Town v1.1 · progress saves automatically', 16, TXT.grey));
   };
 
   // ── scene helpers ──────────────────────────────────────────────
@@ -482,9 +488,16 @@ globalThis.WT = globalThis.WT || {};
 
   /** Cover-fit a background image to the 1280×720 stage. Returns the image. */
   ui.background = function (scene, key) {
+    const V = WT.VIEW;
     const img = scene.add.image(W / 2, H / 2, key);
-    img.setScale(Math.max(W / img.width, H / img.height));
+    img.setScale(Math.max(V.w / img.width, V.h / img.height));
     return img;
+  };
+
+  /** A rectangle covering the whole visible screen (safe area plus any extra width/height). */
+  ui.fullRect = function (scene, color, alpha) {
+    const V = WT.VIEW;
+    return scene.add.rectangle(V.x + V.w / 2, V.y + V.h / 2, V.w + 4, V.h + 4, color, alpha);
   };
 
   /** Map a point from a cover-fitted background's source pixels to stage coordinates. */
@@ -495,12 +508,13 @@ globalThis.WT = globalThis.WT || {};
   /** Ambient floating sparkles (cheap, decorative). */
   ui.sparkles = function (scene, count = 14, tint = 0xfff1c9) {
     for (let i = 0; i < count; i++) {
-      const s = scene.add.image(Phaser.Math.Between(0, W), Phaser.Math.Between(0, H), 'fx_spark')
+      const V = WT.VIEW;
+      const s = scene.add.image(Phaser.Math.Between(V.x, V.x + V.w), Phaser.Math.Between(V.y, V.y + V.h), 'fx_spark')
         .setTint(tint).setAlpha(0).setScale(Phaser.Math.FloatBetween(0.25, 0.6)).setDepth(5);
       scene.tweens.add({
         targets: s, alpha: { from: 0, to: 0.9 }, y: s.y - Phaser.Math.Between(20, 60), angle: 90,
         duration: Phaser.Math.Between(1800, 3200), delay: Phaser.Math.Between(0, 3000), yoyo: true, repeat: -1,
-        onRepeat: () => { s.x = Phaser.Math.Between(0, W); },
+        onRepeat: () => { s.x = Phaser.Math.Between(V.x, V.x + V.w); },
       });
     }
   };
@@ -530,7 +544,7 @@ globalThis.WT = globalThis.WT || {};
     });
     scene.input.on('pointerup', () => { dragging = false; });
     scene.input.on('wheel', (p, objs, dx, dy) => {
-      if (p.x < x || p.x > x + w || p.y < y || p.y > y + h) return;
+      if (p.worldX < x || p.worldX > x + w || p.worldY < y || p.worldY > y + h) return;
       content.y = Phaser.Math.Clamp(content.y - dy * 0.6, minY, maxY);
     });
     content.zone = zone;

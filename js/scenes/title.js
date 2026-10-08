@@ -51,14 +51,15 @@ class TitleScene extends Phaser.Scene {
     for (let i = 0; i < 20; i++) {
       const petal = i % 3 === 0;
       const sz = Phaser.Math.Between(14, 26);
-      const x0 = Phaser.Math.Between(0, W);
+      const V = WT.VIEW;
+      const x0 = Phaser.Math.Between(V.x, V.x + V.w);
       const leaf = this.add.image(x0, Phaser.Math.FloatBetween(-40, H), petal ? 'fx_petal' : 'fx_leaf')
         .setDisplaySize(petal ? sz : sz, petal ? sz * 0.7 : sz * 1.6)
         .setTint(petal ? 0xf7b8cd : Phaser.Utils.Array.GetRandom(TINTS))
         .setAlpha(Phaser.Math.FloatBetween(0.6, 0.95)).setDepth(6);
       this.tweens.add({
-        targets: leaf, y: H + 50, duration: Phaser.Math.Between(6000, 11000), repeat: -1,
-        onRepeat: () => { leaf.x = Phaser.Math.Between(0, W); leaf.y = -40; },
+        targets: leaf, y: V.y + V.h + 50, duration: Phaser.Math.Between(6000, 11000), repeat: -1,
+        onRepeat: () => { leaf.x = Phaser.Math.Between(V.x, V.x + V.w); leaf.y = V.y - 40; },
       });
       this.tweens.add({ targets: leaf, x: x0 + Phaser.Math.Between(40, 120), duration: Phaser.Math.Between(1800, 3400), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
       this.tweens.add({ targets: leaf, angle: Phaser.Math.FloatBetween(-400, 400), duration: Phaser.Math.Between(2500, 6500), repeat: -1 });

@@ -83,3 +83,28 @@ test('duplicates add stars, then convert to honey at max stars', () => {
   [r] = WT.summon(1, always);
   assert.ok(!r.starUp && r.honey > 0 && WT.save.honey === before + r.honey);
 });
+
+test('there are 30 bears across all five rarities', () => {
+  const bears = WT.UNIT_IDS.filter(id => WT.UNITS[id].faction === 'bear');
+  assert.strictEqual(bears.length, 30);
+  for (const r of WT.RARITY_ORDER) assert.ok(bears.some(id => WT.UNITS[id].rarity === r), `a ${r} bear exists`);
+});
+
+test('every stage enemy exists in the roster', () => {
+  for (const loc of WT.LOCATIONS) for (const id of loc.waves.flat()) assert.ok(WT.UNITS[id], `${loc.id}: ${id}`);
+});
+
+test('placed decor and themes add charm; café levels pay out once', () => {
+  WT.resetSave();
+  const base = WT.cafeCharm();
+  WT.save.decorOwned.piano = 1;
+  WT.save.decorPlaced.push({ k: 'piano', x: 700, y: 850, f: 0 });
+  WT.save.themesOwned.starlight = 1; WT.save.theme = 'starlight';
+  assert.strictEqual(WT.cafeCharm(), base + WT.DECOR.piano.charm + WT.THEMES.starlight.charm);
+  assert.strictEqual(WT.decorInStorage('piano'), 0);
+  const gems = WT.save.heartstones;
+  const paid = WT.claimCafeLevels();
+  assert.ok(paid.length >= 1);
+  assert.strictEqual(WT.save.heartstones, gems + paid.reduce((s, p) => s + p.heartstones, 0));
+  assert.strictEqual(WT.claimCafeLevels().length, 0, 'no double payout');
+});

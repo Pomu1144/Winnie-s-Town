@@ -1,6 +1,6 @@
 /* ================================================================
  *  TeamScene — pick three friends, read their skills, feed them
- *  honey treats to level up.
+ *  treats (paid in coins) to level up.
  * ================================================================ */
 class TeamScene extends Phaser.Scene {
   constructor() { super('TeamScene'); }
@@ -167,10 +167,10 @@ class TeamScene extends Phaser.Scene {
     // actions
     const cost = WT.treatCost(r.level);
     const maxed = r.level >= WT.MAX_LEVEL;
-    const treat = ui.button(this, lx + 130, 248, 250, 66, maxed ? 'Max level' : 'Honey treat', {
-      color: 'gold', sub: maxed ? '' : `Level up · ${cost} honey`, size: 24, sfx: 'levelUp',
+    const treat = ui.button(this, lx + 130, 248, 250, 66, maxed ? 'Max level' : 'Give a treat', {
+      color: 'gold', sub: maxed ? '' : `Level up · ${cost} coins`, size: 24, sfx: 'levelUp',
       onClick: () => {
-        if (!WT.buyLevel(id)) { WT.ui.toast(this, 'Not enough honey — collect tips or win battles!'); return; }
+        if (!WT.buyLevel(id)) { WT.ui.toast(this, 'Not enough coins — collect tips or win battles!'); return; }
         m.close();
         this.time.delayedCall(180, () => { this.scene.restart({ filter: this.filter }); });
         this.time.delayedCall(260, () => WT.ui.toast(this, `${u.name} reached level ${WT.save.roster[id].level}!`));
