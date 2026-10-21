@@ -98,6 +98,11 @@ class BootScene extends Phaser.Scene {
     this.load.image('slot',           'assets/backgrounds/inventoryslot.png');
     this.load.image('charlocked',     'assets/backgrounds/characterlocked.png');
     this.load.image('charexist',      'assets/backgrounds/characterexist.png');
+
+    // Characters
+    this.load.spritesheet('princessbear', 'assets/characters/princess_bear_seal.png', {
+      frameWidth: PRINCESS_BEAR.frameWidth, frameHeight: PRINCESS_BEAR.frameHeight,
+    });
   }
 
   create() {
@@ -109,6 +114,15 @@ class BootScene extends Phaser.Scene {
     g.fillTriangle(10, 2, 3, 20, 17, 20);
     g.generateTexture('leaf', 20, 38);
     g.destroy();
+
+    if (this.textures.exists('princessbear')) {
+      this.anims.create({
+        key: 'princessbear-sleep',
+        frames: this.anims.generateFrameNumbers('princessbear', { frames: PRINCESS_BEAR.frames.sleep }),
+        frameRate: 0.8,
+        repeat: -1,
+      });
+    }
 
     this.scene.start(START_SCENE_BY_PAGE[CURRENT_PAGE] || 'CafeFrontScene');
   }
@@ -162,6 +176,200 @@ const TopBarMixin = {
     }
   },
 };
+
+// ================================================================
+//  Princess Bear — a crowned bear in a pink gown riding her seal
+// ================================================================
+
+/**
+ * Sprite sheet: 4 × 3 grid. Every pose faces left (the seal's head),
+ * so the sprite is flipped when travelling right.
+ */
+const PRINCESS_BEAR = {
+  key: 'princessbear',
+  name: 'Princess Bear',
+  frameWidth: 282,
+  frameHeight: 254,
+  portraitFrame: 2,
+  frames: {
+    scepter: 0, sleep: [1, 9], hearts: 2, roses: 3,
+    cheer: 4, bow: 5, point: 6, dash: 7,
+    hug: 8, snooze: 9, boba: 10, cool: 11,
+  },
+};
+
+const PB_IDLE_POSES = ['scepter', 'hearts', 'roses', 'point', 'hug', 'boba', 'cool'];
+
+class PrincessBear extends Phaser.GameObjects.Sprite {
+  /**
+   * @param {Phaser.Scene} scene
+   * @param {object} opts  { x, groundY, height, minX, maxX, wander }
+   */
+  constructor(scene, opts) {
+    super(scene, opts.x, opts.groundY, PRINCESS_BEAR.key, PRINCESS_BEAR.frames.hearts);
+    scene.add.existing(this);
+    this.setOrigin(0.5, 1);
+
+    this._wander = opts.wander !== false;
+    this._idleCount = 0;
+    this._timer = null;
+    this._busy = false;
+    this.setArea(opts);
+
+    this.setInteractive({ useHandCursor: true, pixelPerfect: true, alphaTolerance: 1 });
+    this.on('pointerdown', () => this.react());
+    this.once('destroy', () => this._clearTimer());
+
+    this._startBreathing();
+    this._idle();
+  }
+
+  /** Re-layout (called on resize). */
+  setArea({ groundY, height, minX, maxX }) {
+    this.baseScale = height / PRINCESS_BEAR.frameHeight;
+    this.groundY = groundY;
+    this.minX = minX ?? this.x;
+    this.maxX = maxX ?? this.x;
+    this.x = Phaser.Math.Clamp(this.x, this.minX, this.maxX);
+    this.y = groundY;
+    this.setScale(this.baseScale);
+    if (this._breath) this._startBreathing();
+  }
+
+  // ── Behaviour loop ─────────────────────────────────────────────
+  _schedule(ms, fn) {
+    this._clearTimer();
+    this._timer = this.scene.time.delayedCall(ms, fn, null, this);
+  }
+
+  _clearTimer() {
+    if (this._timer) { this._timer.remove(false); this._timer = null; }
+  }
+
+  _setPose(name) {
+    this.anims.stop();
+    this.setFrame(PRINCESS_BEAR.frames[name]);
+  }
+
+  _startBreathing() {
+    if (this._breath) this._breath.stop();
+    // Gentle seal squish: wider + shorter, anchored at the ground line
+    this.setScale(this.baseScale);
+    this._breath = this.scene.tweens.add({
+      targets: this,
+      scaleX: this.baseScale * 1.025,
+      scaleY: this.baseScale * 0.975,
+      duration: 900,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+  }
+
+  _idle() {
+    this._busy = false;
+    this._setPose(Phaser.Utils.Array.GetRandom(PB_IDLE_POSES));
+    this._idleCount++;
+    this._schedule(Phaser.Math.Between(2400, 4200), this._next);
+  }
+
+  _next() {
+    const roll = Math.random();
+    if (this._idleCount > 4 && roll < 0.25) return this._sleep();
+    if (roll < 0.12) return this._showBow();
+    if (this._wander && this.maxX > this.minX && roll < 0.6) return this._dash();
+    this._idle();
+  }
+
+  _dash() {
+    const span = this.maxX - this.minX;
+    let tx = Phaser.Math.FloatBetween(this.minX, this.maxX);
+    if (Math.abs(tx - this.x) < span * 0.2) tx = this.x < (this.minX + this.maxX) / 2 ? this.maxX : this.minX;
+
+    this._busy = true;
+    this._setPose('dash');
+    this.setFlipX(tx > this.x);
+    this._clearTimer();
+    this.scene.tweens.add({
+      targets: this,
+      x: tx,
+      duration: Math.max(600, Math.abs(tx - this.x) / 0.18),
+      ease: 'Sine.easeInOut',
+      onComplete: () => { if (this.active) this._idle(); },
+    });
+  }
+
+  _showBow() {
+    this._setPose('bow');
+    this._puff('♥', 0xff8fb8);
+    this._schedule(1800, this._idle);
+  }
+
+  _sleep() {
+    this._idleCount = 0;
+    this.anims.play('princessbear-sleep');
+    this._zzz = this.scene.time.addEvent({
+      delay: 1100, repeat: 4,
+      callback: () => this.active && this._puff('z', 0x9b6fd0, 20),
+    });
+    this._schedule(Phaser.Math.Between(6000, 9000), () => { this._zzz?.remove(); this._idle(); });
+  }
+
+  /** Tap reaction: hop, cheer and burst of hearts. */
+  react() {
+    if (this._hopping) return;
+    this._hopping = true;
+    this._zzz?.remove();
+    this.scene.tweens.killTweensOf(this);
+    this._breath = null;
+    this.setScale(this.baseScale);
+    this._setPose(Math.random() < 0.5 ? 'cheer' : 'scepter');
+
+    for (let i = 0; i < 5; i++) {
+      this.scene.time.delayedCall(i * 90, () => this.active && this._puff('♥', 0xff6fa5));
+    }
+
+    this.scene.tweens.add({
+      targets: this,
+      y: this.groundY - this.displayHeight * 0.18,
+      duration: 220,
+      yoyo: true,
+      repeat: 1,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        if (!this.active) return;
+        this.y = this.groundY;
+        this._hopping = false;
+        this._startBreathing();
+        this._schedule(1200, this._idle);
+      },
+    });
+  }
+
+  /** Floating emote (heart / z) above her crown. */
+  _puff(char, color, size) {
+    const s = this.scene;
+    const top = this.y - this.displayHeight * 0.9;
+    const t = s.add.text(
+      this.x + Phaser.Math.Between(-this.displayWidth * 0.3, this.displayWidth * 0.3), top, char,
+      {
+        fontSize: `${size || Math.round(18 + Math.random() * 12)}px`,
+        color: '#' + color.toString(16).padStart(6, '0'),
+        fontFamily: 'Arial', fontStyle: 'bold',
+        stroke: '#ffffff', strokeThickness: 3,
+      },
+    ).setOrigin(0.5).setDepth(this.depth + 1);
+    s.tweens.add({
+      targets: t,
+      y: top - Phaser.Math.Between(40, 80),
+      x: t.x + Phaser.Math.Between(-20, 20),
+      alpha: 0,
+      duration: 1300,
+      ease: 'Sine.easeOut',
+      onComplete: () => t.destroy(),
+    });
+  }
+}
 
 
 // ================================================================
@@ -285,6 +493,7 @@ class InsideCafeScene extends Phaser.Scene {
 
     this._buildTopBar();
     this._buildHUD();
+    this._spawnPrincessBear();
 
     this.scale.on('resize', this._onResize, this);
     this.cameras.main.fadeIn(400);
@@ -316,14 +525,15 @@ class InsideCafeScene extends Phaser.Scene {
     const CY  = H - SZ / 2 - 18;
     const PX  = 22, PY = 14;
 
-    const pill = this.add.graphics();
+    this._hudTop = CY - SZ / 2 - PY;
+    const pill = this.add.graphics().setDepth(6);
     drawPill(pill, SX - PX, CY - SZ / 2 - PY, TW + PX * 2, SZ + PY * 2, 30, 0x120a04, 0.82, 0xf5c842, 0.55);
     this._hudObjs.push(pill);
 
     BTNS.forEach((b, i) => {
       const bx  = SX + i * (SZ + GAP) + SZ / 2;
       // Uniform scale — fit the icon square within SZ × SZ
-      const btn = this.add.image(bx, CY, b.key).setInteractive({ useHandCursor: true });
+      const btn = this.add.image(bx, CY, b.key).setDepth(6).setInteractive({ useHandCursor: true });
       const s   = fitScale(btn, SZ, SZ);
       btn.setScale(s);
 
@@ -337,6 +547,23 @@ class InsideCafeScene extends Phaser.Scene {
 
       this._hudObjs.push(btn);
     });
+  }
+
+  // ── Princess Bear wandering the café floor ─────────────────────
+  _bearArea() {
+    const W = this.scale.width, H = this.scale.height;
+    // Floor starts ~76% down the background art; stay above the HUD pill
+    const floorY = this.bg.y + (0.88 - 0.5) * this.bg.displayHeight;
+    const groundY = Math.min(floorY, this._hudTop - 6);
+    const height = Phaser.Math.Clamp(H * 0.26, 110, 240);
+    const halfW = height * (PRINCESS_BEAR.frameWidth / PRINCESS_BEAR.frameHeight) / 2;
+    return { groundY, height, minX: halfW + 8, maxX: W - halfW - 8 };
+  }
+
+  _spawnPrincessBear() {
+    if (!this.textures.exists(PRINCESS_BEAR.key)) return;
+    const area = this._bearArea();
+    this.princessBear = new PrincessBear(this, { x: this.scale.width * 0.5, ...area }).setDepth(5);
   }
 
   _handleBtnAction(id) {
@@ -423,6 +650,7 @@ class InsideCafeScene extends Phaser.Scene {
     coverFit(this.bg, W, H);
     this._buildTopBar();
     this._buildHUD();
+    this.princessBear?.setArea(this._bearArea());
     if (this._invOpen) {
       this._dim?.setPosition(W / 2, H / 2).setSize(W, H);
       this._invPanel?.setPosition(W / 2, H / 2);
@@ -632,6 +860,11 @@ class TeamScene extends Phaser.Scene {
         slotImg.setScale(fitScale(slotImg, slotW, slotH));
         this._uiObjs.push(slotImg);
 
+        if (r === 0 && c === 0 && this.textures.exists(PRINCESS_BEAR.key)) {
+          this._buildBearCard(sx, sy, slotW, slotH);
+          continue;
+        }
+
         // Locked indicator for empty slots
         const lockImg = this.add.image(sx + slotW / 2, sy + slotH / 2,
           this.textures.exists('charlocked') ? 'charlocked' : '__DEFAULT');
@@ -680,6 +913,34 @@ class TeamScene extends Phaser.Scene {
       this.time.delayedCall(400, () => navigateToPage('shop'));
     });
     this._uiObjs.push(backGfx, backLabel, backHit);
+  }
+
+  /** Unlocked team slot: Princess Bear portrait — tap to cycle her poses. */
+  _buildBearCard(sx, sy, slotW, slotH) {
+    // The slot art (1500×1000 canvas) shows as a ~0.64·slotW square at the slot centre
+    const cx = sx + slotW / 2;
+    const cy = sy + slotH / 2;
+
+    const sprite = this.add.sprite(cx, cy + slotW * 0.13, PRINCESS_BEAR.key, PRINCESS_BEAR.portraitFrame)
+      .setOrigin(0.5, 1);
+    const s = fitScale(sprite, slotW * 0.56, slotW * 0.42);
+    sprite.setScale(s).setInteractive({ useHandCursor: true });
+
+    const poses = PB_IDLE_POSES.concat('cheer');
+    let i = 0;
+    sprite.on('pointerdown', () => {
+      i = (i + 1) % poses.length;
+      sprite.setFrame(PRINCESS_BEAR.frames[poses[i]]);
+      this.tweens.add({ targets: sprite, scaleX: s * 1.08, scaleY: s * 0.94, duration: 110, yoyo: true });
+    });
+
+    const name = this.add.text(cx, cy + slotW * 0.15, PRINCESS_BEAR.name, {
+      fontSize: `${Math.round(Phaser.Math.Clamp(slotW * 0.075, 11, 18))}px`,
+      color: '#5a2d0c', fontFamily: 'Arial', fontStyle: 'bold',
+      align: 'center', wordWrap: { width: slotW * 0.7 },
+    }).setOrigin(0.5, 0);
+
+    this._uiObjs.push(sprite, name);
   }
 
   _onResize(gameSize) {
