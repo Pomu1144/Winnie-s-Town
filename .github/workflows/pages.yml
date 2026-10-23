@@ -29,10 +29,11 @@ jobs:
       # Ship only what the game loads; the full-size source art stays in the repo.
       - name: Assemble site
         run: |
-          mkdir -p _site/assets
+          mkdir -p _site/assets/characters
           cp *.html manifest.webmanifest _site/
           cp -r css js _site/
           cp -r assets/units assets/arenas assets/ui assets/opt _site/assets/
+          cp assets/characters/princess_bear_seal.png _site/assets/characters/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
