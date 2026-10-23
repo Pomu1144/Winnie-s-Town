@@ -62,6 +62,7 @@ class BootScene extends Phaser.Scene {
     L.image('npc_winnie', 'assets/opt/characters/bearorginator.webp');
     ['fox', 'bird', 'monkey'].forEach(k => L.image('npc_' + k, `assets/opt/characters/civillian_${k}.webp`));
     L.image('npc_seal', 'assets/opt/characters/sealorigin.webp');
+    WT.loadPrincessBear(L);
     // ui
     L.image('oven', 'assets/ui/oven.webp');
     ['tank', 'striker', 'mage', 'support'].forEach(k => L.image('role_' + k, `assets/ui/role_${k}.webp`));
@@ -82,6 +83,7 @@ class BootScene extends Phaser.Scene {
 
   _finish() {
     this._makeTextures();
+    WT.makePrincessBearAnims(this);
     const start = WT.START_SCENE || 'TitleScene';
     this.cameras.main.fadeOut(250, 251, 227, 207);
     this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start(start));

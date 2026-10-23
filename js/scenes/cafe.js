@@ -17,6 +17,7 @@ class CafeScene extends Phaser.Scene {
     this._winnie();
     this._decor();
     this._customers();
+    this._princessBear();
     this._tipJar();
     ui.sparkles(this, 10, 0xffe7b8);
 
@@ -101,6 +102,14 @@ class CafeScene extends Phaser.Scene {
       this.tweens.add({ targets: img, y: p.y - 4, duration: 900 + i * 120, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: i * 200 });
       this.time.addEvent({ delay: 3500 + i * 1700, loop: true, callback: () => this._heartPop(img.x, img.y - img.displayHeight) });
     });
+  }
+
+  /** Princess Bear wanders the café floor in front of the customers. */
+  _princessBear() {
+    if (!this.textures.exists(WT.PRINCESS_BEAR.key)) return;
+    const ground = this._p(750, 800), left = this._p(300, 800), right = this._p(1200, 800);
+    this.princessBear = new PrincessBear(this, { x: ground.x, groundY: ground.y, height: 150, minX: left.x, maxX: right.x })
+      .setDepth(25 + 800 / 10);
   }
 
   _heartPop(x, y) {
